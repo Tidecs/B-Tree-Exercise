@@ -5,6 +5,7 @@
 #include<stdlib.h>
 #include<string.h>
 #include<sys/types.h>
+#include<fcntl.h>
 #include<unistd.h>
 #include<limits.h>
 #include<time.h>
@@ -13,9 +14,11 @@
 #define DEGREE_2 (DEGREE * 2)
 #define true 1
 #define false 0
-#define DATALENGTH 32
-#define FALSE_KEY INT_MIN
-#define FALSE_DATA ((DATATYPE)({"FALSE_DATA"}))
+
+#define STRINGLENGTH 32
+#define LEAF_LENGTH 4
+#define NUM_LENGTH 4
+#define KEY_LENGTH 4
 
 typedef struct BPlusTreeNode *PBTreeNode;
 typedef struct BPlusTree *BPTree;
@@ -25,7 +28,7 @@ typedef struct RangeData RangeDataes;
 
 struct MyData
 {
-  char idcard[DATALENGTH];
+  char idcard[STRINGLENGTH];
 };
 
 struct BPlusTreeNode
@@ -67,5 +70,9 @@ extern DATATYPE* travelDataN(BPTree T,int count);
 
 extern void showRange(RangeDataes dataes);
 extern void showBPlusTree(BPTree T);
+
+extern int serialize(const char *filePath, BPTree tree);
+extern BPTree deserialize(const char *filePath);
+
 
 #endif /* BPlusTree.h */

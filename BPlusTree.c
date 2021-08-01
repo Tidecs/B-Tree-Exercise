@@ -473,29 +473,6 @@ static void btreeMergeChild(PBTreeNode x, int index)
   x->num -= 1;
 }
 
-
-#if 0
-static void replaceFirstKeyAndDataWithLeftSibling(PBTreeNode x, KEYTYPE key, DATATYPE data)
-{
-  x->key[0] = key;
-  if(x->leaf)
-  {
-    copyData(x->data[0], &data);
-    return ;
-  }
-  else
-  {
-    replaceFirstKeyAndDataWithLeftSibling(x->children[0], key, data);
-  }
-}
-
-static void replaceKeyAndDataWithRightSibling(PBTreeNode x, KEYTYPE key, DATATYPE data)
-{
-  
-}
-#endif
-
-
 static KEYTYPE btreeRemoveGTDegree(PBTreeNode x, KEYTYPE key)
 {
   int position = findUpperPosition(x, key);
@@ -592,6 +569,7 @@ extern BPTree removeKey(BPTree T, KEYTYPE key)
   return T;
 }
 
+
 static void destroyNodeRecursively(PBTreeNode x)
 {
   if(x->leaf)
@@ -619,5 +597,178 @@ extern BPTree destroy(BPTree T)
   free(T);
 }
 
+
+static PBTreeNode deserializeNode(int fd, PBTreeNode *preNode)
+{
+  int i;
+  PBTreeNode pnode = (PBTreeNode)malloc(sizeof(struct BPlusTreeNode));
+
+  if((i = read(fd, &pnode->leaf, LEAF_LENGTH)) == -1)
+  {
+    printf("DeserializeNode error: READ LEAF\n");
+    return NULL;
+  }
+
+  if((i = read(fd, &pnode->num, NUM_LENGTH)) == -1)
+  {
+    printf("DeserializeNode error: READ NUM\n");
+    return NULL;
+  }
+
+  for(int j = 0 ; j<pnode->num ; j++)
+  {
+    if((i = read(fd, &pnode->key[j], KEY_LENGTH)) == -1)
+    {
+      printf("DeserializeNode error: READ key[%d]\n", i);
+      return NULL;
+    }
+  }
+
+  //难点：在先序遍历的反序列化中，如何维护叶结点指针next
+  if(!pnode->leaf)
+  {
+    for(int j = 0; j<pnode->num ; j++)
+    {
+      if((pnode->children[j] = deserializeNode(fd, preNode)) == NULL)
+      {
+        return NULL;
+      }
+
+      //解决难点：在参数中传递一个前叶结点指针的指针
+      if(pnode->children[j]->leaf && j>0)
+      {
+        pnode->children[j-1]->next = pnode->children[j];
+      }
+      if(pnode->children[j]->leaf && j == 0)
+      {
+        (*preNode)->next = pnode->children[j];
+      }
+      if(pnode->children[j]->leaf && j == pnode->num-1)
+      {
+        *preNode = pnode->children[j];
+      }
+    }
+  }
+  else
+  {
+    pnode->next = NULL;
+    for(int j = 0; j<pnode->num ; j++)
+    {
+      pnode->data[j] = (DATATYPE*)malloc(sizeof(DATATYPE));
+      if((i = read(fd, pnode->data[j], sizeof(DATATYPE))) == -1)
+      {
+        printf("DeserializeNode error: READ data[%d]\n", j);
+        return NULL;
+      }
+    }
+  }
+
+  return pnode;
+}
+
+extern BPTree deserialize(const char *filePath)
+{
+  int fd, tag;
+  if((fd = open(filePath, O_RDWR)) == -1)
+  {
+    printf("Open error in Deserialize\n");
+    return NULL;
+  }
+
+  BPTree btree = (BPTree)malloc(sizeof(struct BPlusTree));
+  if((tag = read(fd, &btree->total_key_num, 4)) == -1)
+  {
+    return NULL;
+  }
+  
+  btree->root = deserializeNode(fd, &btree->first);    //这里有bug，因为会修改btree->root到最后一个叶子结点
+  btree->first = findMostLeft(btree->root);
+
+  if((tag = close(fd)) == -1)
+  {
+    printf("Close error in Deserialize\n");
+    return NULL;
+  }
+
+  return btree;
+}
+
+static int serializeNode(PBTreeNode pnode, int fd)
+{
+  int i;
+
+  if((i = write(fd, &pnode->leaf, LEAF_LENGTH)) == -1)
+  {
+    printf("SerializeNode error: WRITE LEAF\n");
+    return false;
+  }
+
+  if((i = write(fd, &pnode->num, NUM_LENGTH)) == -1)
+  {
+    printf("SerializeNode error: WRITE NUM\n");
+    return false;
+  }
+
+  for(int j = 0 ; j<pnode->num ; j++)
+  {
+    if((i = write(fd, &pnode->key[j], KEY_LENGTH)) == -1)
+    {
+      printf("SerializeNode error: WRITE key[%d]\n", j);
+      return false;
+    }
+  }
+
+  if(!pnode->leaf)
+  {
+    for(int j = 0; j<pnode->num ; j++)
+    {
+      if((i = serializeNode(pnode->children[j], fd)) == -1)
+      {
+        return false;
+      }
+    }
+  }
+  else
+  {
+    for(int j = 0; j<pnode->num; j++)
+    {
+      if((i = write(fd, pnode->data[j], sizeof(DATATYPE))) == -1)
+      {
+        printf("SerializeNode error: WRITE data[%d]\n", j);
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+extern int serialize(const char *filePath, BPTree tree)
+{
+  int fd;
+  int tag = true;
+  if((fd = open(filePath, O_RDWR | O_CREAT | O_TRUNC, 00700)) == -1)
+  {
+    printf("Open error in Serialize\n");
+    return false;
+  }
+
+  if((tag = write(fd, &tree->total_key_num, 4)) == -1)
+  {
+    return false;
+  }
+
+  if((tag = serializeNode(tree->root, fd)) == false)
+  {
+    return false;
+  }
+
+  if((tag = close(fd)) == -1)
+  {
+    return false;
+  }
+
+  return tag;
+}
 
 
