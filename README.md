@@ -1,2 +1,2 @@
 # B-Tree-Exercise
-This is an implementation of the BPlusTree.
+This is an implementation of BPlusTree.
