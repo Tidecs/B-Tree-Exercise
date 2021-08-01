@@ -9,16 +9,19 @@
 #include<limits.h>
 #include<time.h>
 
-#define DEGREE 8
+#define DEGREE 2
 #define DEGREE_2 (DEGREE * 2)
 #define true 1
 #define false 0
 #define DATALENGTH 32
+#define FALSE_KEY INT_MIN
+#define FALSE_DATA ((DATATYPE)({"FALSE_DATA"}))
 
 typedef struct BPlusTreeNode *PBTreeNode;
 typedef struct BPlusTree *BPTree;
 typedef int KEYTYPE;
 typedef struct MyData DATATYPE;
+typedef struct RangeData RangeDataes;
 
 struct MyData
 {
@@ -42,13 +45,19 @@ struct BPlusTree
   PBTreeNode first;
 };
 
+struct RangeData
+{
+  DATATYPE *data;
+  KEYTYPE *key;
+  int num;
+};
 
 extern BPTree initialize();
 extern DATATYPE* search(BPTree T, KEYTYPE key);
 extern BPTree update(BPTree T, KEYTYPE KEY, DATATYPE newData);
 extern BPTree insert(BPTree T, KEYTYPE key, DATATYPE data);
 extern BPTree removeKey(BPTree T, KEYTYPE key);
-extern DATATYPE* searchRange(BPTree T, KEYTYPE begin, KEYTYPE end);
+extern RangeDataes searchRange(BPTree T, KEYTYPE begin, KEYTYPE end);
 extern BPTree destroy(BPTree T);
 
 extern KEYTYPE* travel(BPTree T);
@@ -56,6 +65,7 @@ extern KEYTYPE* travelN(BPTree T,int count);
 extern DATATYPE* travelData(BPTree T);
 extern DATATYPE* travelDataN(BPTree T,int count);
 
+extern void showRange(RangeDataes dataes);
 extern void showBPlusTree(BPTree T);
 
 #endif /* BPlusTree.h */

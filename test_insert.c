@@ -8,7 +8,7 @@ int main()
   char buffer[20] = "abc";
 
   srand((unsigned int)time(0));
-  for(int i=5; i<13 ; i++)
+  for(int i=0; i<15 ; i++)
   {
     strcpy(dataes[0].idcard, buffer); 
     insert(T,  i , dataes[0]);
@@ -40,8 +40,11 @@ int main()
     printf("\n######################\n");
     printf("\n%d\n", T->total_key_num);
   
-  update(T, 10, (DATATYPE){"aaa"});
+  //update(T, 10, (DATATYPE){"aaa"});
   showBPlusTree(T);
+
+  RangeDataes range_data = searchRange(T, 3, 9);
+  showRange(range_data);
   
   KEYTYPE* keys = travel(T);
   for(int i = 0; i<T->total_key_num ; i++)
@@ -49,7 +52,7 @@ int main()
     printf("%d ", keys[i]);
   }
   
-
+  destroy(T);
   printf("\n");
 #if 0
   DATATYPE* travelDataes = travelData(T);

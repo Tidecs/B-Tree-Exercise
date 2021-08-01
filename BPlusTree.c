@@ -2,6 +2,7 @@
 
 static KEYTYPE unavailable = INT_MIN;
 static void copyData(DATATYPE *dest, DATATYPE *source);
+static void moveKeyFromAToB(PBTreeNode x, int a, int b);
 
 static PBTreeNode createNode(int isLeaf)
 {
@@ -73,7 +74,7 @@ static int findUpperPosition(PBTreeNode x, KEYTYPE targetKey)
   while(low < high)
   {
     mid = (low + high + 1) / 2;
-   if(targetKey < x->key[mid])
+    if(targetKey < x->key[mid])
     {
       high = mid-1;
     }
@@ -84,6 +85,27 @@ static int findUpperPosition(PBTreeNode x, KEYTYPE targetKey)
   }
 
   return high;
+}
+
+static int findLowerPosition(PBTreeNode x, KEYTYPE targetKey)
+{
+  int low = 0, high = x->num-1;
+  int mid;
+  
+  while(low < high)
+  {
+    mid = (low + high) / 2;
+    if(x->key[mid] < targetKey)
+    {
+      low = mid + 1;
+    }
+    else
+    {
+      high = mid;
+    }
+  }
+
+  return low;
 }
 
 extern DATATYPE* search(BPTree T, KEYTYPE key)
@@ -105,12 +127,84 @@ extern DATATYPE* search(BPTree T, KEYTYPE key)
   return NULL;
 }
 
+extern RangeDataes searchRange(BPTree T, KEYTYPE begin, KEYTYPE end)
+{
+  PBTreeNode pnode = T->root;
+  KEYTYPE findKey = unavailable;
+  int position = INT_MIN;
+  RangeDataes dataes;
+  dataes.data = NULL;
+  dataes.key = NULL;
+  dataes.num = 0;
+
+  while(!pnode->leaf)
+  {
+    position = findUpperPosition(pnode, begin);
+    pnode = pnode->children[position];
+  }
+  position = findLowerPosition(pnode, begin);
+
+  //如果当前结点内都是比begin小的值，那么就移动到下一结点 
+  if(pnode->key[position] < begin)
+  {
+    pnode = pnode->next;
+    if(pnode == NULL)
+    {
+      return dataes;
+    }
+    position = 0;
+  }
+
+  //偏移量是进入新结点后的开始索引,num记录当前已存储key的数量
+  int offset = 0, num = 0;
+  int size = DEGREE_2;
+  DATATYPE *search_data = (DATATYPE*)malloc(size * sizeof(DATATYPE));
+  KEYTYPE *search_key = (KEYTYPE*)malloc(size * sizeof(KEYTYPE));
+
+  //处理当前结点,position 是当前结点大于等于begin的第一个key的位置
+  for(int i = position; i<pnode->num && pnode->key[i] <= end ; i++)
+  {
+    copyData(&search_data[offset + i-position], pnode->data[i]);
+    search_key[offset + i - position] = pnode->key[i];
+    num++;
+  }
+
+  //处理接下来一部分结点，需要增加分配空间
+  offset += num;
+  while(pnode->key[pnode->num - 1] <= end && pnode->next != NULL )
+  {
+    pnode = pnode->next;
+    search_data = (DATATYPE*)realloc(search_data, (size + num) * sizeof(DATATYPE));
+    search_key = (KEYTYPE*)realloc(search_key, (size + num) * sizeof(KEYTYPE));
+
+    int i;    //i是当前结点中小于等于end的key 的数量
+    for(i = 0; i<pnode->num && pnode->key[i] <= end ; i++)
+    {
+      copyData(&search_data[offset + i], pnode->data[i]);
+      search_key[offset + i] = pnode->key[i];
+      num++;      
+    }
+    offset += i;    //这里从for循环退出后，i 已经是 pnode->num 的值了
+  }
+
+  //收缩分配空间，将数据返回
+  search_data = (DATATYPE*)realloc(search_data, num * sizeof(DATATYPE));
+  search_key = (KEYTYPE*)realloc(search_key, num * sizeof(KEYTYPE));
+
+  dataes.data = search_data;
+  dataes.key = search_key;
+  dataes.num = num;
+
+  return dataes;
+}
+
 extern BPTree update(BPTree T, KEYTYPE key, DATATYPE newData)
 {
   DATATYPE *data = search(T, key);
   if(data == NULL)
   {
     printf("update error!");
+    return NULL;
   }
   copyData(data, &newData);
 
@@ -120,23 +214,23 @@ extern BPTree update(BPTree T, KEYTYPE key, DATATYPE newData)
 
 static void btreeSplitChild(PBTreeNode x, int i) 
 { 
-	PBTreeNode y = x->children[i];
-	PBTreeNode z = createNode(y->leaf);
+  PBTreeNode y = x->children[i];
+  PBTreeNode z = createNode(y->leaf);
+
+  z->num = DEGREE;
  
-	z->num = DEGREE;
- 
-	int j = 0;
-	for (j = 0; j < DEGREE ; j++) 
+  int j = 0;
+  for (j = 0; j < DEGREE ; j++) 
   {
-		z->key[j] = y->key[j+DEGREE];
-	}
-	if (!y->leaf) 
+    z->key[j] = y->key[j+DEGREE];
+  }
+  if (!y->leaf) 
   {
-		for (j = 0; j < DEGREE ; j++) 
+    for (j = 0; j < DEGREE ; j++) 
     {
-			z->children[j] = y->children[j+DEGREE];
-		}
-	}
+      z->children[j] = y->children[j+DEGREE];
+    }
+  }
   else
   {
     z->next = y->next;
@@ -146,16 +240,16 @@ static void btreeSplitChild(PBTreeNode x, int i)
       z->data[j] = y->data[j+DEGREE];
     }
   }
-	y->num = DEGREE;
+  y->num = DEGREE;
 
-	for (j = x->num; j > i+1 ; j--) 
+  for (j = x->num; j > i+1 ; j--) 
   {
     x->key[j] = x->key[j-1];
-		x->children[j] = x->children[j-1];
-	}
+    x->children[j] = x->children[j-1];
+  }
   x->key[i+1] = z->key[0];
-	x->children[i+1] = z;
-	x->num += 1;
+  x->children[i+1] = z;
+  x->num += 1;
 }
 
 static void copyData(DATATYPE *dest, DATATYPE *source)
@@ -274,6 +368,14 @@ extern void showBPlusTree(BPTree T)
   }
 }
 
+extern void showRange(RangeDataes dataes)
+{
+  for(int i = 0; i<dataes.num ; i++)
+  {
+    printf("key %d is %s\n",dataes.key[i], dataes.data[i].idcard);
+  }
+}
+
 
 extern KEYTYPE* travelN(BPTree T, int num)
 {
@@ -371,6 +473,7 @@ static void btreeMergeChild(PBTreeNode x, int index)
   x->num -= 1;
 }
 
+
 #if 0
 static void replaceFirstKeyAndDataWithLeftSibling(PBTreeNode x, KEYTYPE key, DATATYPE data)
 {
@@ -392,7 +495,6 @@ static void replaceKeyAndDataWithRightSibling(PBTreeNode x, KEYTYPE key, DATATYP
 }
 #endif
 
-static void moveKeyFromAToB(PBTreeNode x, int a, int b);
 
 static KEYTYPE btreeRemoveGTDegree(PBTreeNode x, KEYTYPE key)
 {
@@ -489,4 +591,33 @@ extern BPTree removeKey(BPTree T, KEYTYPE key)
 
   return T;
 }
+
+static void destroyNodeRecursively(PBTreeNode x)
+{
+  if(x->leaf)
+  {
+    for(int i = 0; i<x->num ; i++)
+    {
+      free(x->data[i]);
+    }
+    free(x);
+  }
+  else
+  {
+    for(int i = 0; i<x->num ; i++)
+    {
+      destroyNodeRecursively(x->children[i]);
+    }
+    free(x);
+  }
+}
+
+extern BPTree destroy(BPTree T)
+{
+  PBTreeNode x = T->root;
+  destroyNodeRecursively(x);
+  free(T);
+}
+
+
 
