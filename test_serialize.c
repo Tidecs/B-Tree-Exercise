@@ -5,9 +5,10 @@ int main()
   BPTree tree = initialize();
   DATATYPE data = { "abc" };
 
-  for(int i = 0; i<1000 ; i++)
+  srand((unsigned int)time(0));
+  for(int i = 0; i<100 ; i++)
   {
-    insert(tree, i, data);
+    insert(tree, rand()%3000, data);
   }
 
   showBPlusTree(tree);
@@ -19,14 +20,16 @@ int main()
   }
 
   destroy(tree);
+  tree = NULL;
+
   BPTree newTree = deserialize("data1");
   showBPlusTree(newTree);
-  p = travel(tree);
-  for(int i = 0; i<tree->total_key_num ; i++)
+  p = travel(newTree);
+  for(int i = 0; i<newTree->total_key_num ; i++)
   {
     printf(": %d ",p[i]);
   }
-  printf("\n");
+  printf("\n %p \n", tree );
 
   return 0;
 }

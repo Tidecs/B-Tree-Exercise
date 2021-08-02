@@ -595,6 +595,9 @@ extern BPTree destroy(BPTree T)
   PBTreeNode x = T->root;
   destroyNodeRecursively(x);
   free(T);
+  T = NULL;
+
+  return T;
 }
 
 
