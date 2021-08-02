@@ -89,7 +89,8 @@ static int findUpperPosition(PBTreeNode x, KEYTYPE targetKey)
 
 static int findLowerPosition(PBTreeNode x, KEYTYPE targetKey)
 {
-  int low = 0, high = x->num-1;
+  int low = 0;
+  int high = x->num-1;
   int mid;
   
   while(low < high)
@@ -106,6 +107,27 @@ static int findLowerPosition(PBTreeNode x, KEYTYPE targetKey)
   }
 
   return low;
+}
+
+static int findLastLTPosition(PBTreeNode x, KEYTYPE targetKey)
+{
+  int low = 0, high = x->num-1;
+  int mid;
+
+  while(low < high)
+  {
+    mid = (low + high +1) / 2;
+    if(targetKey <= x->key[mid])
+    {
+      high = mid - 1;
+    }
+    else
+    {
+      low = mid;
+    }
+  }
+
+  return high;
 }
 
 extern DATATYPE* search(BPTree T, KEYTYPE key)
@@ -139,7 +161,7 @@ extern RangeDataes searchRange(BPTree T, KEYTYPE begin, KEYTYPE end)
 
   while(!pnode->leaf)
   {
-    position = findUpperPosition(pnode, begin);
+    position = findLastLTPosition(pnode, begin);
     pnode = pnode->children[position];
   }
   position = findLowerPosition(pnode, begin);
@@ -287,10 +309,10 @@ static KEYTYPE btreeInsertNonfull(PBTreeNode x, KEYTYPE k, DATATYPE data)
 
 		if (x->children[i]->num == DEGREE_2) {
 			btreeSplitChild(x, i);
-			if (k > x->key[i+1]) i++;
+			if (k >= x->key[i+1]) i++;    //将 k > x->key[i+1] 条件修改了 为 >= 
 		}
 
-		x->key[i] = btreeInsertNonfull(x->children[i], k, data);
+		x->key[i] = btreeInsertNonfull(x->children[i], k, data);    //这行代码保证了key[0]被删除后，可以用递归修改为key[1]
     return x->key[0];
 	}
 }
@@ -311,7 +333,7 @@ extern BPTree insert(BPTree T, KEYTYPE key, DATATYPE data)
 		btreeSplitChild(pnode, 0);
  
 		int i = 0;
-		if (pnode->key[i+1] < key) i++;
+		if (pnode->key[i+1] <= key) i++;    //将条件 pnode->key[i+1] < key 修改为 <=
 		btreeInsertNonfull(pnode->children[i], key, data);
 		
 	} else {

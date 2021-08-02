@@ -40,10 +40,13 @@ int main()
     printf("\n######################\n");
     printf("\n%d\n", T->total_key_num);
   
+  insert(T,  3 , (DATATYPE){"A"});
+  insert(T,  3 , (DATATYPE){"B"});
+  insert(T,  3 , (DATATYPE){"C"});
   //update(T, 10, (DATATYPE){"aaa"});
   showBPlusTree(T);
 
-  RangeDataes range_data = searchRange(T, 3, 9);
+  RangeDataes range_data = searchRange(T, 3, 3);
   showRange(range_data);
   
   KEYTYPE* keys = travel(T);
@@ -51,9 +54,10 @@ int main()
   {
     printf("%d ", keys[i]);
   }
+  printf("\n");
   
   destroy(T);
-  printf("\n");
+  T = NULL;
 #if 0
   DATATYPE* travelDataes = travelData(T);
   for(int i = 0; i<8 ; i++)
