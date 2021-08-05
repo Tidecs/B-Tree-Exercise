@@ -1,7 +1,7 @@
 #include "BPlusTree.h"
 
 static KEYTYPE unavailable = INT_MIN;
-static void copyData(DATATYPE *dest, DATATYPE *source);
+static void copyData(DATATYPE *dest, DATATYPE const *source);
 static void moveKeyFromAToB(PBTreeNode x, int a, int b);
 
 static PBTreeNode createNode(int isLeaf)
@@ -149,15 +149,15 @@ extern DATATYPE* search(BPTree T, KEYTYPE key)
   return NULL;
 }
 
-extern RangeDataes searchRange(BPTree T, KEYTYPE begin, KEYTYPE end)
+extern RangeDataes* searchRange(BPTree T, KEYTYPE begin, KEYTYPE end)
 {
   PBTreeNode pnode = T->root;
   KEYTYPE findKey = unavailable;
   int position = INT_MIN;
-  RangeDataes dataes;
-  dataes.data = NULL;
-  dataes.key = NULL;
-  dataes.num = 0;
+  RangeDataes *dataes = (RangeDataes*)malloc(sizeof(RangeDataes));
+  dataes->data = NULL;
+  dataes->key = NULL;
+  dataes->num = 0;
 
   while(!pnode->leaf)
   {
@@ -213,22 +213,22 @@ extern RangeDataes searchRange(BPTree T, KEYTYPE begin, KEYTYPE end)
   search_data = (DATATYPE*)realloc(search_data, num * sizeof(DATATYPE));
   search_key = (KEYTYPE*)realloc(search_key, num * sizeof(KEYTYPE));
 
-  dataes.data = search_data;
-  dataes.key = search_key;
-  dataes.num = num;
+  dataes->data = search_data;
+  dataes->key = search_key;
+  dataes->num = num;
 
   return dataes;
 }
 
-extern BPTree update(BPTree T, KEYTYPE key, DATATYPE newData)
+extern BPTree update(BPTree T, KEYTYPE key, DATATYPE const *newData)
 {
   DATATYPE *data = search(T, key);
   if(data == NULL)
   {
-    printf("update error!");
+    printf("update error!\n");
     return NULL;
   }
-  copyData(data, &newData);
+  copyData(data, newData);
 
   return T;
 }
@@ -274,12 +274,12 @@ static void btreeSplitChild(PBTreeNode x, int i)
   x->num += 1;
 }
 
-static void copyData(DATATYPE *dest, DATATYPE *source)
+static void copyData(DATATYPE *dest, DATATYPE const *source)
 {
   strcpy(dest->idcard, source->idcard);
 }
 
-static KEYTYPE btreeInsertNonfull(PBTreeNode x, KEYTYPE k, DATATYPE data) 
+static KEYTYPE btreeInsertNonfull(PBTreeNode x, KEYTYPE k, DATATYPE const *data) 
 {
  
 	int i = x->num -1;
@@ -296,7 +296,7 @@ static KEYTYPE btreeInsertNonfull(PBTreeNode x, KEYTYPE k, DATATYPE data)
 		}
     
     //x->data[i+1] = (DATATYPE*)calloc(1,sizeof(DATATYPE));
-    copyData(x->data[i+1], &data);    
+    copyData(x->data[i+1], data);    
 		x->key[i+1] = k;
 		x->num += 1;
 
@@ -317,7 +317,7 @@ static KEYTYPE btreeInsertNonfull(PBTreeNode x, KEYTYPE k, DATATYPE data)
 	}
 }
 
-extern BPTree insert(BPTree T, KEYTYPE key, DATATYPE data) 
+extern BPTree insert(BPTree T, KEYTYPE key, DATATYPE const *data) 
 {
   T->total_key_num += 1;
 	PBTreeNode r = T->root;
@@ -390,11 +390,11 @@ extern void showBPlusTree(BPTree T)
   }
 }
 
-extern void showRange(RangeDataes dataes)
+extern void showRange(RangeDataes const *dataes)
 {
-  for(int i = 0; i<dataes.num ; i++)
+  for(int i = 0; i<dataes->num ; i++)
   {
-    printf("key %d is %s\n",dataes.key[i], dataes.data[i].idcard);
+    printf("key %d is %s\n",dataes->key[i], dataes->data[i].idcard);
   }
 }
 
@@ -563,7 +563,7 @@ static void moveKeyFromAToB(PBTreeNode x, int a, int b)
     tmpKey = p->key[p->num-1];
     copyData(&tmpData, p->data[p->num-1]);
     btreeRemoveGTDegree(x->children[a], tmpKey);
-    btreeInsertNonfull(x->children[b], tmpKey, tmpData);
+    btreeInsertNonfull(x->children[b], tmpKey, &tmpData);
   }
   else if(a > b)
   {
@@ -571,7 +571,7 @@ static void moveKeyFromAToB(PBTreeNode x, int a, int b)
     tmpKey = p->key[0];
     copyData(&tmpData, p->data[0]);
     btreeRemoveGTDegree(x->children[a], tmpKey);
-    btreeInsertNonfull(x->children[b], tmpKey, tmpData);    
+    btreeInsertNonfull(x->children[b], tmpKey, &tmpData);    
   }
 }
 
@@ -584,6 +584,7 @@ extern BPTree removeKey(BPTree T, KEYTYPE key)
     return T;
   }
 
+  printf("remove:%d %s\n", key, data->idcard);
   T->total_key_num -= 1; 
   PBTreeNode r = T->root;
   btreeRemoveGTDegree(r, key);
@@ -591,6 +592,13 @@ extern BPTree removeKey(BPTree T, KEYTYPE key)
   return T;
 }
 
+
+extern void destroyRangedata(RangeDataes *data)
+{
+  free(data->data);
+  free(data->key);
+  free(data);
+}
 
 static void destroyNodeRecursively(PBTreeNode x)
 {
@@ -617,7 +625,6 @@ extern BPTree destroy(BPTree T)
   PBTreeNode x = T->root;
   destroyNodeRecursively(x);
   free(T);
-  T = NULL;
 
   return T;
 }
@@ -700,7 +707,7 @@ extern BPTree deserialize(const char *filePath)
     return NULL;
   }
 
-  BPTree btree = (BPTree)malloc(sizeof(struct BPlusTree));
+  BPTree btree = initialize();
   if((tag = read(fd, &btree->total_key_num, 4)) == -1)
   {
     return NULL;
@@ -771,7 +778,7 @@ static int serializeNode(PBTreeNode pnode, int fd)
 extern int serialize(const char *filePath, BPTree tree)
 {
   int fd;
-  int tag = true;
+  int tag;
   if((fd = open(filePath, O_RDWR | O_CREAT | O_TRUNC, 00700)) == -1)
   {
     printf("Open error in Serialize\n");
@@ -780,20 +787,22 @@ extern int serialize(const char *filePath, BPTree tree)
 
   if((tag = write(fd, &tree->total_key_num, 4)) == -1)
   {
+    printf("serialize error 2\n");
     return false;
   }
 
   if((tag = serializeNode(tree->root, fd)) == false)
   {
+    printf("serialize error 3\n");
     return false;
   }
 
   if((tag = close(fd)) == -1)
   {
+    printf("serialize error 4\n");
     return false;
   }
 
-  return tag;
+  return true;
 }
-
 

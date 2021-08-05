@@ -57,18 +57,19 @@ struct RangeData
 
 extern BPTree initialize();
 extern DATATYPE* search(BPTree T, KEYTYPE key);
-extern BPTree update(BPTree T, KEYTYPE KEY, DATATYPE newData);
-extern BPTree insert(BPTree T, KEYTYPE key, DATATYPE data);
+extern BPTree update(BPTree T, KEYTYPE KEY, DATATYPE const *newData);
+extern BPTree insert(BPTree T, KEYTYPE key, DATATYPE const *data);
 extern BPTree removeKey(BPTree T, KEYTYPE key);
-extern RangeDataes searchRange(BPTree T, KEYTYPE begin, KEYTYPE end);
+extern RangeDataes* searchRange(BPTree T, KEYTYPE begin, KEYTYPE end);
 extern BPTree destroy(BPTree T);
+extern void destroyRangedata(RangeDataes *data);
 
 extern KEYTYPE* travel(BPTree T);
 extern KEYTYPE* travelN(BPTree T,int count);
 extern DATATYPE* travelData(BPTree T);
 extern DATATYPE* travelDataN(BPTree T,int count);
 
-extern void showRange(RangeDataes dataes);
+extern void showRange(RangeDataes const *dataes);
 extern void showBPlusTree(BPTree T);
 
 extern int serialize(const char *filePath, BPTree tree);
