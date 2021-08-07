@@ -5,6 +5,8 @@
 static int command(int argc, char *argv[]);
 static char* trim(char* s);
 static BPTree tree;
+static clock_t start, end;
+static double duration;
 
 int main(int argc, char **argv)
 {
@@ -36,6 +38,9 @@ int main(int argc, char **argv)
       }
     }
 
+    /*
+    **在这里使用线程执行命令，就是并发。并发的前提要理解锁的机制
+    */
     if(command(argc1, argv_3) < 0)
       break;
   }
@@ -60,7 +65,7 @@ static char* trim(char *s)
  return s;
 }
 
-void printhelp()
+static void printhelp()
 {
   printf("please input commands:\n");
   printf("exit \ninitDB file \ninsert key data \nsearch key \nsearch key1 key2 \n");
@@ -83,7 +88,7 @@ static int command(int argc, char *argv[])
 
   if(argc == 1)
   {
-    if(tree == NULL)
+    if(tree == NULL && strcmp(argv[0], "init")!=0)
     {
       printf("please init!\n");
       return 0;
@@ -106,8 +111,24 @@ static int command(int argc, char *argv[])
 
     else if(!strcmp(argv[0], "destroy"))
     {
+      start = clock();
       destroy(tree);
+      end = clock();
+      duration = (double)(end - start)/CLOCKS_PER_SEC;
+      printf("time of destroy is %f\n", duration);
       tree = NULL;
+      return 0;
+    }
+
+    else if(!strcmp(argv[0], "init"))
+    {
+      if(tree != NULL){
+        printf("tree has been created, please destroy\n");
+        return 0;
+      }
+      tree = initialize();
+      if(tree == NULL)
+        printf("init false\n");
       return 0;
     }
 
@@ -133,7 +154,12 @@ static int command(int argc, char *argv[])
         return 0;
       }
 
+      start = clock();
       tree = deserialize(argv[1]);
+      end = clock();
+      duration = (double)(end - start)/CLOCKS_PER_SEC;
+      printf("time of initDB %s is %f\n", argv[1], duration);
+
       if(tree == NULL)
         printf("initDB false\n");
       return 0;
@@ -141,27 +167,45 @@ static int command(int argc, char *argv[])
 
     else if(!strcmp(argv[0], "search"))
     {
+      start = clock();
       DATATYPE *data = search(tree, atoi(argv[1]));
+      end = clock();
       if(data == NULL)
       {
         printf("cant find this key!\n");
         return 0;
       }
       printf("%d : %s\n",atoi(argv[1]), data->idcard);
+      duration = (double)(end - start)/CLOCKS_PER_SEC;
+      printf("time of search %s is %f\n", argv[1], duration);
       return 0;
     }
 
     else if(!strcmp(argv[0], "remove"))
     {
-      removeKey(tree, atoi(argv[1]));
+      start = clock();
+      if(NULL == removeKey(tree, atoi(argv[1])))
+      {
+        return 0;
+      }
+      end = clock();
+      duration = (double)(end - start)/CLOCKS_PER_SEC;
+      printf("time of remove %s is %f\n", argv[1], duration);
       return 0;
     }
 
     else if(!strcmp(argv[0], "write"))
     {
+      start = clock();
       int tag = serialize(argv[1], tree);
+      end = clock();
       if(tag != 1)
+      {
         printf("write false\n");
+        return 0;
+      }
+      duration = (double)(end - start)/CLOCKS_PER_SEC;
+      printf("time of write %s is %f\n", argv[1], duration);
       return 0;
     }
 
@@ -184,18 +228,29 @@ static int command(int argc, char *argv[])
     {
       DATATYPE *data = (DATATYPE*)malloc(sizeof(DATATYPE));
       strcpy(data->idcard, argv[2]);
+      start = clock();
       insert(tree, atoi(argv[1]), data);
+      end = clock();
+      duration = (double)(end - start)/CLOCKS_PER_SEC;
+
+      printf("insert: %d : %s\n", atoi(argv[1]), data->idcard);
+      printf("time of insert %s : %s is %f\n", argv[1], argv[2], duration);
       free(data);
       return 0;
     }
 
     else if(!strcmp(argv[0], "search"))
     {
+      start = clock();
       RangeDataes *dataes = searchRange(tree, atoi(argv[1]), atoi(argv[2]));
+      end = clock();
+      duration = (double)(end - start)/CLOCKS_PER_SEC;
+
       for(int i = 0; i< dataes->num ; i++)
       {
         printf("%d : %s\n", dataes->key[i], dataes->data[i].idcard);
       }
+      printf("time of search %s to %s is %f\n", argv[1], argv[2], duration);
 
       free(dataes->key);
       free(dataes->data);
@@ -207,7 +262,13 @@ static int command(int argc, char *argv[])
     {
       DATATYPE *data = (DATATYPE*)malloc(sizeof(DATATYPE));
       strcpy(data->idcard, argv[2]);
+      start = clock();
       update(tree, atoi(argv[1]), data);
+      end = clock();
+      duration = (double)(end - start)/CLOCKS_PER_SEC;
+
+      printf("updata: %d : %s\n", atoi(argv[1]), data->idcard);
+      printf("time of update %s : %s is %f\n", argv[1], argv[2], duration);
       free(data);
       return 0;
     }

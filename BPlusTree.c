@@ -65,6 +65,11 @@ static PBTreeNode findMostRight(PBTreeNode x)
   return temp;
 }
 
+/* 
+**功能：找到结点x中键值小于等于targetKey的最后一个值的下标
+**输入：结点指针，键值
+**返回：下标
+*/
 static int findUpperPosition(PBTreeNode x, KEYTYPE targetKey)
 {
   int low = 0;
@@ -87,6 +92,11 @@ static int findUpperPosition(PBTreeNode x, KEYTYPE targetKey)
   return high;
 }
 
+/* 
+**功能：找到结点x中键值大于等于targetKey的第一个值的下标
+**输入：结点指针，键值
+**返回：下标
+*/
 static int findLowerPosition(PBTreeNode x, KEYTYPE targetKey)
 {
   int low = 0;
@@ -109,6 +119,11 @@ static int findLowerPosition(PBTreeNode x, KEYTYPE targetKey)
   return low;
 }
 
+/* 
+**功能：找到结点x中键值小于targetKey的最后一个值的下标
+**输入：结点指针，键值
+**返回：下标
+*/
 static int findLastLTPosition(PBTreeNode x, KEYTYPE targetKey)
 {
   int low = 0, high = x->num-1;
@@ -129,6 +144,7 @@ static int findLastLTPosition(PBTreeNode x, KEYTYPE targetKey)
 
   return high;
 }
+
 
 extern DATATYPE* search(BPTree T, KEYTYPE key)
 {
@@ -234,6 +250,14 @@ extern BPTree update(BPTree T, KEYTYPE key, DATATYPE const *newData)
 }
 
 
+/* 
+**功能：分裂满结点y = x->children[i]，此时y->num = 2t
+**输入：需要分裂结点的父结点，在父结点的孩子数组中的下标i
+**具体描述：
+**1.新建结点z，将x->children[i]的后t个键值及孩子或数据复制到z
+**2.调整z->num = y->num = t
+**3.将x中下标为 i+1 到 x->num-1 的<键值，数据>右移，将z插入到i+1位置
+*/
 static void btreeSplitChild(PBTreeNode x, int i) 
 { 
   PBTreeNode y = x->children[i];
@@ -279,66 +303,90 @@ static void copyData(DATATYPE *dest, DATATYPE const *source)
   strcpy(dest->idcard, source->idcard);
 }
 
+/* 
+**功能：将<键值,数据>插入到一个非满结点x
+**输入：结点x，键值x，数据data
+**返回：插入后结点的第一个Key值，也就是最小key值
+**具体描述：
+**1.如果是叶子结点，将大于插入键值的key右移一个位置，然后插入数据即可
+**2.如果是内部结点，找到应该插入位置对应的孩子结点。若孩子结点已满，分裂该
+**结点，调整插入孩子结点的位置（y 还是 z）继续递归插入;若孩子结点未满，直
+**接递归插入数据。
+**3.x->key[i] = btreeInsertNonfull(x->children[i], k, data);
+**  ...
+**  return x->key[0];//此处key[0]是已经插入新数据后的key[0]
+**  这两行代码保证了若孩子结点key[0]被修改后，可以在递归回溯后修改父亲结
+** 点的key值
+*/
 static KEYTYPE btreeInsertNonfull(PBTreeNode x, KEYTYPE k, DATATYPE const *data) 
 {
+  int i = x->num -1;
  
-	int i = x->num -1;
- 
-	if (x->leaf) 
+  if (x->leaf) 
   {
-    x->data[i+1] = (DATATYPE*)calloc(1,sizeof(DATATYPE));
-		while (i >= 0 && x->key[i] > k) 
-    {
-			x->key[i+1] = x->key[i];
-      //x->data[i+1] = (DATATYPE*)calloc(1,sizeof(DATATYPE));
-      copyData(x->data[i+1], x->data[i]);
-			i--;
-		}
-    
     //x->data[i+1] = (DATATYPE*)calloc(1,sizeof(DATATYPE));
+    while (i >= 0 && x->key[i] > k) 
+    {
+      x->key[i+1] = x->key[i];
+      //copyData(x->data[i+1], x->data[i]);
+      x->data[i+1] = x->data[i];
+      i--;
+		}
+
+    x->data[i+1] = (DATATYPE*)calloc(1,sizeof(DATATYPE));
     copyData(x->data[i+1], data);    
-		x->key[i+1] = k;
-		x->num += 1;
+    x->key[i+1] = k;
+    x->num += 1;
 
     return x->key[0];
 	} 
   else 
   {
-		while (i >= 0 && x->key[i] > k) i--;    //这行代码，无法处理在key[i]中比插入比key[i]的值
+    while (i >= 0 && x->key[i] > k) i--;    //这行代码，无法处理在key[i]中比插入比key[i]的值
     if(i == -1) i+=1;    //用这行代码作为补充
 
-		if (x->children[i]->num == DEGREE_2) {
-			btreeSplitChild(x, i);
-			if (k >= x->key[i+1]) i++;    //将 k > x->key[i+1] 条件修改了 为 >= 
-		}
-
-		x->key[i] = btreeInsertNonfull(x->children[i], k, data);    //这行代码保证了key[0]被删除后，可以用递归修改为key[1]
+    if (x->children[i]->num == DEGREE_2) {
+      btreeSplitChild(x, i);
+      if (k >= x->key[i+1]) i++;    //将 k > x->key[i+1] 条件修改了 为 >= 
+    }
+    //这行代码保证了若孩子结点key[0]被修改后，可以在递归回溯后修改父亲结点
+    x->key[i] = btreeInsertNonfull(x->children[i], k, data);    
     return x->key[0];
 	}
 }
 
+/* 
+**功能：插入<key，data>，这是生成新结点并为之分配空间的唯一函数。
+**输入：b+树，键值，数据
+**返回：b+树
+**具体描述：
+**1.令b+树T的总键值数+1
+**2.若根结点未满，调用btreeInsertNonfull直接插入数据。若根结点r满，令新
+**结点node为根结点，node的第一个孩子指向r,node的第一个键值为r->key[0]
+**然后再分裂r，并调用btreeInsertNonfull插入数据
+*/
 extern BPTree insert(BPTree T, KEYTYPE key, DATATYPE const *data) 
 {
   T->total_key_num += 1;
-	PBTreeNode r = T->root;
-	if (r->num == DEGREE_2) {
+  PBTreeNode r = T->root;
+  if (r->num == DEGREE_2) {
 		
-		PBTreeNode pnode = createNode(false);
-		T->root = pnode;
+    PBTreeNode pnode = createNode(false);
+    T->root = pnode;
  
-		pnode->children[0] = r;
+    pnode->children[0] = r;
     pnode->key[0] = r->key[0];
     pnode->num = 1;
  
-		btreeSplitChild(pnode, 0);
+    btreeSplitChild(pnode, 0);  //分裂原根结点r
  
-		int i = 0;
-		if (pnode->key[i+1] <= key) i++;    //将条件 pnode->key[i+1] < key 修改为 <=
-		btreeInsertNonfull(pnode->children[i], key, data);
+    int i = 0;
+    if (pnode->key[i+1] <= key) i++;    //将条件 pnode->key[i+1] < key 修改为 <=
+    btreeInsertNonfull(pnode->children[i], key, data);
 		
-	} else {
-		btreeInsertNonfull(r, key, data);
-	}
+  } else {
+    btreeInsertNonfull(r, key, data);
+  }
 
   return T;
 }
@@ -455,6 +503,14 @@ static void deleteButNotDestroyBPlusNode(PBTreeNode x)
   x = NULL;
 }
 
+/* 
+**功能：合并两个num == t 的相邻结点，children[i+1]合并到children[i]
+**输入：父结点x指针, 相邻结点中下标较小的结点的下标
+**具体描述：
+**1.将结点z的0～t-1的key以及data或children复制回y的t~2t-1
+**2.调整y->num = 2t ,如果是叶子结点，调整next指针，y->next = z->next
+**3.调整父亲结点，下标 index+2～num-1 的键值及孩子结点指针左移。
+*/
 static void btreeMergeChild(PBTreeNode x, int index)
 {
   PBTreeNode y = x->children[index];
@@ -495,6 +551,22 @@ static void btreeMergeChild(PBTreeNode x, int index)
   x->num -= 1;
 }
 
+/* 
+**功能：从一个 num>t 的结点中删除<key,data>。
+**输入：结点指针x,键值key
+**返回：结点在删除操作完成后的key[0]
+**具体描述：
+**1.加强的限制条件：删除路径中，沿途结点在进入前,通过借或合并，保证num>t
+**2.若是叶子结点，直接调整data和key中的元素位置，删除目标<key，data>
+**3.若是内部结点，找到要递归删除的孩子结点的下标position，如果孩子结点
+**num>t,直接递归删除；如果num == t，则需要借或者合并。
+**4.若兄弟结点有任一个结点num>t，则向该兄弟结点借一个前驱或后继，否则与兄**弟结点合并。
+**5.x->key[position] = btreeRemoveGTDegree(x->children[position], key);
+**  ...
+**  return x->key[0];//此处key[0]是已经删除数据后的key[0]
+**  这两行代码保证了若孩子结点key[0]被修改后，可以在递归回溯后修改父亲结
+** 点的key值
+*/
 static KEYTYPE btreeRemoveGTDegree(PBTreeNode x, KEYTYPE key)
 {
   int position = findUpperPosition(x, key);
@@ -552,6 +624,14 @@ static KEYTYPE btreeRemoveGTDegree(PBTreeNode x, KEYTYPE key)
   }
 }
 
+/* 
+**功能：B结点向A结点借一个前驱或后继<key,data>
+**输入：父亲结点x， A下标a, B下标b
+**具体描述：
+**1.若a < b，则B向A借的是前驱<key,data>；否则借的是后继<key,data>
+**2.从A中删除这个前驱或后继<key,data>
+**3.将前驱或后继<key,data>插入B
+*/
 static void moveKeyFromAToB(PBTreeNode x, int a, int b)
 {
   PBTreeNode p;
@@ -559,7 +639,7 @@ static void moveKeyFromAToB(PBTreeNode x, int a, int b)
   DATATYPE tmpData;
   if(a < b)
   {
-    p = findMostRight(x->children[a]);
+    p = findMostRight(x->children[a]); /* 找到前驱<key,data> */
     tmpKey = p->key[p->num-1];
     copyData(&tmpData, p->data[p->num-1]);
     btreeRemoveGTDegree(x->children[a], tmpKey);
@@ -567,7 +647,7 @@ static void moveKeyFromAToB(PBTreeNode x, int a, int b)
   }
   else if(a > b)
   {
-    p = findMostLeft(x->children[a]);
+    p = findMostLeft(x->children[a]); /* 找到后继<key,data> */
     tmpKey = p->key[0];
     copyData(&tmpData, p->data[0]);
     btreeRemoveGTDegree(x->children[a], tmpKey);
@@ -575,13 +655,19 @@ static void moveKeyFromAToB(PBTreeNode x, int a, int b)
   }
 }
 
+/* 
+**功能：在b+树T中，删除<key,data>
+**输入：b+树指针，键值
+**返回：操作结束后的b+树
+**具体描述：若要删除的键值存在，令总键值数目减1,调用btreeRemoveGTDegree
+*/
 extern BPTree removeKey(BPTree T, KEYTYPE key)
 {
   DATATYPE * data = search(T, key);
   if(data == NULL)
   {
     printf("Remove error! These isn't the key!");
-    return T;
+    return NULL;
   }
 
   printf("remove:%d %s\n", key, data->idcard);
@@ -713,7 +799,7 @@ extern BPTree deserialize(const char *filePath)
     return NULL;
   }
   
-  btree->root = deserializeNode(fd, &btree->first);    //这里有bug，因为会修改btree->root到最后一个叶子结点
+  btree->root = deserializeNode(fd, &btree->first);
   btree->first = findMostLeft(btree->root);
 
   if((tag = close(fd)) == -1)
